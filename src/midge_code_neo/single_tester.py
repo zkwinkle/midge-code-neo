@@ -1,0 +1,245 @@
+import asyncio
+import cmd
+import time
+from threading import Thread
+
+from midge_badge_framework.connection import MidgeBadgeClient
+from midge_badge_framework.protocol import (
+    BadgeAssignment,
+    BadgeID,
+    CmdEraseSDRequest,
+    CmdGetFWVersionRequest,
+    CmdSetupExperimentRequest,
+    CmdStartMicRequest,
+    CmdStartScanRequest,
+    CmdStatusRequest,
+    CmdStopMicRequest,
+    CmdStopScanRequest,
+    MidgeBadgeCommand,
+    get_bitfield_width,
+)
+
+
+class MidgeBadgeConsole(cmd.Cmd):
+    def __init__(self):
+        super().__init__()
+        self.clients: list[MidgeBadgeClient] = []
+        self.active_client = None
+
+    def do_dummy(self, _):
+        "dummy command"
+        print("Dummy Command")
+
+    def do_connect(self, arg):
+        """
+        Try to connect to a Midge Badge and select as active connection
+        Usage:
+            connect [any|<mac address>]
+
+        if "any" is selected, the command will look for any Mingle Midge without an active
+        connection. Otherwise, a mac address is expected
+        """
+
+        if arg == "":
+            print("Error: Invalid syntax")
+            return
+
+        address = None if arg == "any" else arg
+        client = MidgeBadgeClient(address)
+        # Launch the client in a new thread
+        Thread(target=lambda: asyncio.run(client.start())).start()
+        # wait a bit to see if the connection was established
+        time.sleep(4)
+
+        if client.get_connected():
+            print("Connection successfully started!")
+            self.clients.append(client)
+            self.active_client = client
+        else:
+            print("Error: Failed to establish connection")
+
+        return
+
+    def do_list(self, _):
+        """
+        List addresses of connected Mingle Midges
+        """
+        print(f"{len(self.clients)} active client(s)")
+        for c in self.clients:
+            print(f"- {c.get_address()}")
+
+    def do_select(self, arg):
+        """
+        Select which MidgeBadge to communicate with
+        Usage:
+            select <address>
+        """
+        # TODO: Logic for all
+        if arg != "":
+            for c in self.clients:
+                if c.get_address() == arg:
+                    self.active_client = c
+                    print("Found valid connection, changing selected")
+                    return
+            print("Error: Unable to find such device")
+        else:
+            print("Error: Invalid syntax, please provide an address")
+            return
+
+    def __common_cmd_execute(self, request: MidgeBadgeCommand):
+        """
+        Common utility to send commands to the active Midge Badge, request must be already initialized
+        """
+        if self.active_client is None:
+            print("Error: No selected client")
+        elif not self.active_client.get_connected():
+            print("Error: Connection of selected client was closed")
+            self.clients.remove(self.active_client)
+            if self.clients != []:
+                self.active_client = self.clients[0]
+                print(f"Switched active client to {self.active_client.address}")
+            else:
+                print("Warning: No active clients, connect to a new client before sending another command")
+
+        else:
+            print(f"Sent {self.active_client.get_address()} the request: {request}")
+            self.active_client.execute_command_log_resp(request)
+
+    def do_setup_experiment(self, arg):
+        """
+        Issue the "setup-experiment" command to the active Midge Badge, which
+        initializes the badge's storage for a new experiment and assigns it a badge ID (group + badge number)
+
+        Usage:
+            setup_experiment <group_id> <badge_id> <experiment_id>
+
+        Note: group_id, badge_id and experiment_id must be numbers.
+              group_id must be between 0 and 15, badge_id must be between 0 and 4095
+        """
+        args = arg.split(" ")
+        if len(args) != 3:
+            print("Error: Invalid syntax, expected 3 arguments")
+            return
+        try:
+            group_id = int(args[0], base=0)
+            badge_id = int(args[1], base=0)
+            experiment_id = int(args[2], base=0)
+        except Exception as _:
+            print("Error: Invalid syntax, arguments must be numbers")
+            return
+
+        group_id_max = 2 ** get_bitfield_width(BadgeID, "group") - 1
+        badge_id_max = 2 ** get_bitfield_width(BadgeID, "badge") - 1
+
+        if group_id < 0 or group_id > group_id_max:
+            print(f"Error: Invalid group_id, must be between 0 and {group_id_max}")
+            return
+        if badge_id < 0 or badge_id > badge_id_max:
+            print(f"Error: Invalid badge_id, must be between 0 and {badge_id_max}")
+            return
+
+        badge_assignment = BadgeAssignment()
+        badge_assignment.id.group = group_id
+        badge_assignment.id.badge = badge_id
+
+        request = CmdSetupExperimentRequest(badge_assignment, experiment_id)
+        self.__common_cmd_execute(request)
+
+    def do_status(self, _):
+        """
+        Issue the "status" command
+        Usage:
+            status
+        """
+
+        timestamp_ms = time.time_ns() // 1_000_000
+        request = CmdStatusRequest(timestamp_ms)
+        self.__common_cmd_execute(request)
+
+    def do_get_fw_version(self, _):
+        """
+        Issue a "get-fw-version" command that requests the Midge Badge to send back its firmware version string
+        Usage:
+            get_fw_version
+        """
+        request = CmdGetFWVersionRequest()
+        self.__common_cmd_execute(request)
+
+    def do_start_mic(self, arg):
+        """
+        Issue a "start-mic" command that tells the active Midge Badge to start sampling audio
+        Usage:
+            start_mic <sample_id> <mode>
+        """
+        args = arg.split(" ")
+        try:
+            id = int(args[0], 0)
+            mode = int(args[1], 0)
+        except Exception as _:
+            print("Error: Invalid syntax, <sample_id> must be a number")
+            return
+
+        request = CmdStartMicRequest(id, mode)
+        self.__common_cmd_execute(request)
+
+    def do_stop_mic(self, _):
+        """
+        Issue a "stop-mic" command that tells the active Midge Badge to stop sampling audio
+        Usage:
+            stop_mic
+        """
+        request = CmdStopMicRequest()
+        self.__common_cmd_execute(request)
+
+    def do_start_scan(self, arg):
+        """
+        Issue a "start-scan" command that tells the active Midge Badge to start scanning for other
+        nearby midges and record the signal strength (rssi) to estimate proximity
+        Usage:
+            start_scan <sample_id>
+        """
+        try:
+            print("TODO other args")
+            id = int(arg, 0)
+        except Exception as _:
+            print("Error: Invalid syntax, <sample_id> must be a number")
+            return
+        request = CmdStartScanRequest(id, 0x10, 0x10)
+        self.__common_cmd_execute(request)
+
+    def do_stop_scan(self, _):
+        """
+        Issue a "stop-scan" command that tells the active Midge Badge to stop scanning for other
+        nearby midges.
+        Usage:
+            stop_scan
+        """
+        request = CmdStopScanRequest()
+        self.__common_cmd_execute(request)
+
+    def do_erase_sd(self, _):
+        """
+        Issue a "erase-sd" command which will re-format the sd card in the Midge Badge
+        Usage:
+            erase_sd
+        """
+        request = CmdEraseSDRequest()
+        self.__common_cmd_execute(request)
+
+    def do_exit(self, _):
+        "exit program"
+        for client in self.clients:
+            client.stop()
+        exit()
+
+
+async def main():
+    MidgeBadgeConsole().cmdloop()
+
+
+def main_sync():
+    asyncio.run(main())
+
+
+if __name__ == "__main__":
+    main_sync()

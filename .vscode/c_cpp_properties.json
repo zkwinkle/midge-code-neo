@@ -1,0 +1,13 @@
+{
+    "configurations": [
+        {
+            "name": "arm-none-eabi",
+            "includePath": [
+                "${workspaceFolder}/firmware/**",
+                "${env:ZEPHYR_BASE}/**/include/**"
+            ],
+            "defines": []
+        }
+    ],
+    "version": 4
+}

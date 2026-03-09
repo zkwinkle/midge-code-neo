@@ -1,0 +1,36 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "zephyr",
+            "cwd": "${workspaceFolder}/firmware",
+            "executable": "build/zephyr/zephyr.elf",
+            "request": "launch",
+            "preLaunchTask": "build-firmware",
+            "type": "cortex-debug",
+            "runToEntryPoint": "main",
+            "servertype": "openocd",
+            "device": "nrf52",
+            "configFiles": [
+                "interface/cmsis-dap.cfg",
+                "target/nrf52.cfg"
+            ],
+            "openOCDLaunchCommands": ["adapter speed 2000"],
+            "interface": "swd",
+            "armToolchainPath": "",
+            "svdFile": "/tmp/nrf52832.svd",
+            "preLaunchCommands":["set remotetimeout 60"],
+            "rttConfig": {
+                "enabled": true,
+                "address": "auto",
+                "clearSearch": false,
+                "decoders": [
+                    {
+                        "port": 0,
+                        "type": "console"
+                    }
+                ]
+            }
+        }
+    ]
+}
