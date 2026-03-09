@@ -8,15 +8,15 @@ project(blinky)
 
 # Get the current git commit hash
 execute_process(
-    COMMAND git rev-parse HEAD # replace by hatch version
+    COMMAND uv run hatch version
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    OUTPUT_VARIABLE GIT_COMMIT_HASH
+    OUTPUT_VARIABLE HATCH_VERSION
     OUTPUT_STRIP_TRAILING_WHITESPACE
     ERROR_QUIET
 )
 
 # Add the commit hash as a compile definition
-add_compile_definitions(FW_VERSION="${GIT_COMMIT_HASH}")
+add_compile_definitions(FW_VERSION="${HATCH_VERSION}")
 
 target_sources(app PRIVATE
     src/main.c

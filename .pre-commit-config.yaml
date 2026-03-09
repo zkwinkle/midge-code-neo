@@ -25,7 +25,7 @@ repos:
       # first, lint + autofix
       - id: ruff
         types_or: [python, pyi, jupyter]
-        args: [--fix, --show-fixes]
+        args: [--show-fixes]
       # then, format
       - id: ruff-format
 

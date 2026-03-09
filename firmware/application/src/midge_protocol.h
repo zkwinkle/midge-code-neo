@@ -49,7 +49,7 @@ struct __attribute__((packed)) CmdGetFWVersionRequest{
 };
 
 struct __attribute__((packed)) CmdGetFWVersionResponse{
-  uint8_t version_str[60];
+  uint8_t version_str[32];
 };
 
 struct __attribute__((packed)) CmdStartMicRequest{

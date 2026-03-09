@@ -3,119 +3,14 @@ from ctypes import Structure, Union, c_int16, c_int32, c_uint8, c_uint16, c_uint
 
 
 def mingle_midge_batt_mv_to_percent(mv):
+    # fmt: off
     v_percentage_vector = [
-        0,
-        0,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        2,
-        2,
-        2,
-        2,
-        2,
-        2,
-        2,
-        2,
-        2,
-        3,
-        3,
-        3,
-        3,
-        3,
-        3,
-        3,
-        4,
-        4,
-        4,
-        4,
-        4,
-        4,
-        5,
-        5,
-        5,
-        6,
-        6,
-        7,
-        7,
-        8,
-        8,
-        9,
-        9,
-        10,
-        11,
-        12,
-        13,
-        13,
-        14,
-        15,
-        16,
-        18,
-        19,
-        22,
-        25,
-        28,
-        32,
-        36,
-        40,
-        44,
-        47,
-        51,
-        53,
-        56,
-        58,
-        60,
-        62,
-        64,
-        66,
-        67,
-        69,
-        71,
-        72,
-        74,
-        76,
-        77,
-        79,
-        81,
-        82,
-        84,
-        85,
-        85,
-        86,
-        86,
-        86,
-        87,
-        88,
-        88,
-        89,
-        90,
-        91,
-        91,
-        92,
-        93,
-        94,
-        95,
-        96,
-        97,
-        98,
-        99,
-        100,
-        100,
+        0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 4, 4,
+        4, 4, 4, 4, 5, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11, 12, 13, 13, 14, 15, 16, 18, 19, 22, 25, 28, 32, 36, 40,
+        44, 47, 51, 53, 56, 58, 60, 62, 64, 66, 67, 69, 71, 72, 74, 76, 77, 79, 81, 82, 84, 85, 85, 86, 86, 86, 87, 88,
+        88, 89, 90, 91, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 100,
     ]
+    # fmt: on
     batt_meas_low_mv = 3000
     # batt_meas_full_mv = 4200
     batt_meas_mv_to_soc_delta = 11
@@ -151,6 +46,9 @@ class MidgeBadgeCommand(Structure):
                 # correct mv to battery percentage function
                 batt_percent = mingle_midge_batt_mv_to_percent(mv)
                 ret += f"[battery = {batt_percent} %]"
+            elif field[0] == "version_str":
+                version_str = bytes(getattr(self, field[0])).decode("utf-8")
+                ret += f"[fw_version = {version_str}]"
             else:
                 ret += f"[{field[0]} = {getattr(self, field[0])}]"
         return ret
@@ -217,7 +115,7 @@ class CmdStatusResponse(MidgeBadgeCommand):
         ("audio_init_status", c_uint8),
         ("proximity_init_status", c_uint8),
         ("battery_millivolts", c_int16),
-        ("badge_assigment", BadgeAssignment),
+        ("badge_assignment", BadgeAssignment),
         ("delta_ms", c_uint64),
     ]
 
@@ -235,7 +133,7 @@ class CmdGetFWVersionRequest(MidgeBadgeCommand):
 
 class CmdGetFWVersionResponse(MidgeBadgeCommand):
     _pack_ = 1
-    _fields_ = [("version_str", c_uint8 * 60)]
+    _fields_ = [("version_str", c_uint8 * 32)]
 
     def id() -> bytes:
         return b"C"
