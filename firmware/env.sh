@@ -11,7 +11,7 @@ else
     FW_DIR=$(realpath $(dirname $0))
 fi
 
-FW_DIR=$FW_DIR/firmware
+FW_DIR=$FW_DIR
 source ~/zephyrproject/.venv/bin/activate
 export ZEPHYR_BASE=~/zephyrproject/zephyr
 export BOARD_ROOT=$FW_DIR

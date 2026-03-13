@@ -45,7 +45,7 @@ uint64_t time_control_get_timestamp() {
         LOG_ERR("error timestamp %d", status);
         return 0;
     } else {
-        LOG_INF("got timestamp %llu", ref);
+        LOG_DBG("got timestamp %llu", ref);
         return ref;
     }
 }

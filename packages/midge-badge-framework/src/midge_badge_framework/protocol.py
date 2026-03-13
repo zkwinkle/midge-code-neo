@@ -80,6 +80,21 @@ class BadgeAssignment(Union):
         return ret
 
 
+class CustomAdvertisementData(Structure):
+    _pack_ = 1
+    _fields_ = [
+        ("battery_mv", c_uint16),
+        ("active_sensor_bitflags", c_uint16),
+        ("badge_assignment", BadgeAssignment),
+    ]
+
+    def __str__(self):
+        ret = f"{self.__class__.__name__} : "
+        for field in self._fields_:
+            ret += f"[{field[0]} = {getattr(self, field[0])}]"
+        return ret
+
+
 class CmdSetupExperimentRequest(Structure):
     _pack_ = 1
     _fields_ = [
@@ -173,7 +188,7 @@ class CmdStopMicResponse(MidgeBadgeCommand):
 
 class CmdStartScanRequest(MidgeBadgeCommand):
     _pack_ = 1
-    _fields_ = [("sample_id", c_uint16), ("window", c_uint16), ("interval", c_uint16)]
+    _fields_ = [("sample_id", c_uint16), ("window", c_uint16), ("interval", c_uint16), ("reserved", c_uint16)]
 
     def id() -> bytes:
         return b"F"
