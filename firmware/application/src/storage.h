@@ -23,9 +23,10 @@ enum mb_file_type {
     FILE_TYPE_ACCEL = 3,
     FILE_TYPE_GYRO = 4,
     FILE_TYPE_MAGNETO = 5,
+    FILE_TYPE_ROTATION = 6,
 
     // update prj.conf if this is changed to increase CONFIG_FS_FATFS_NUM_FILES
-    FILE_TYPE_MAX = 5,
+    FILE_TYPE_MAX = 6,
 };
 
 

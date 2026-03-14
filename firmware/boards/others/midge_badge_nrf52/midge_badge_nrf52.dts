@@ -48,7 +48,16 @@
 		};
 	};
 
-	switch_pos{
+	imu_int_pin {
+		compatible = "gpio-keys";
+
+		imu_int: imu_int_pin {
+			gpios = <&gpio0 30 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "IMU interrupt pin";
+		};
+	};
+
+	switch_pos {
 		compatible= "gpio-keys";
 
 		sw_audio_off: sw_0{
@@ -76,6 +85,8 @@
 		sw-audio-low = &sw_audio_low;
 		sw-audio-high = &sw_audio_high;
 		mcuboot-led0 = &led0;
+		imu-i2c = &i2c1;
+		imu-int = &imu_int;
 	};
 };
 
@@ -120,8 +131,8 @@
 	compatible = "nordic,nrf-spim";
 	status = "okay";
 	pinctrl-names = "default", "sleep";
-	pinctrl-0 = <&spi1_default>;
-	pinctrl-1 = <&spi1_sleep>;
+	pinctrl-0 = <&spi0_default>;
+	pinctrl-1 = <&spi0_sleep>;
 	cs-gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;
 	anomaly-58-workaround;
 
@@ -145,6 +156,19 @@ dmic_dev: &pdm0 {
 	clock-source = "PCLK32M_HFXO";
 };
 
+&i2c1 {
+	compatible = "nordic,nrf-twim";
+	status = "okay";
+	pinctrl-0 = <&i2c1_default>;
+	pinctrl-1 = <&i2c1_sleep>;
+	pinctrl-names = "default", "sleep";
+	clock-frequency = <400000>;
+	imu: icm20948@68 {
+		compatible = "invensense,i2c-device";
+		status = "okay";
+		reg = <0x68>;
+	};
+};
 
 &flash0 {
 

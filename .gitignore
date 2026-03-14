@@ -156,3 +156,4 @@ _version.py
 
 # VS Code IDE project settings // exception for this project
 # .vscode/
+.vscode/settings.json

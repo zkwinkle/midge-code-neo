@@ -18,11 +18,14 @@ execute_process(
 # Add the commit hash as a compile definition
 add_compile_definitions(FW_VERSION="${HATCH_VERSION}")
 
+add_subdirectory(src/imu_drv_closed)
+
 target_sources(app PRIVATE
     src/main.c
     src/storage.c
     src/proximity.c
     src/audio.c
+    src/imu.c
     src/battery_charge.c
     src/time_control.c
     src/cmd_processor.c
