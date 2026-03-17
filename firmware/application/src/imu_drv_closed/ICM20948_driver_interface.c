@@ -1,10 +1,12 @@
 #include "ICM20948_driver_interface.h"
+
 #include <string.h>
-#include "Icm20948.h"
-#include "i2c_shim.h"
+#include <zephyr/logging/log.h>
+
 #include "../storage.h"
 #include "../time_control.h"
-#include <zephyr/logging/log.h>
+#include "Icm20948.h"
+#include "i2c_shim.h"
 
 LOG_MODULE_REGISTER(icm20948_interface);
 
@@ -104,7 +106,7 @@ void print_sensor_data(void* context, uint8_t sensortype, uint64_t timestamp, co
 
             err_code = storage_write(FILE_TYPE_ACCEL, &imu_buffer[ACCEL][active_buffer[ACCEL]],
                                      sizeof(imu_sample_t) * IMU_BUFFER_SIZE);
-            if (err_code != 0) {
+            if (err_code < 0) {
                 LOG_ERR("Failed to write accel data to storage: %d", err_code);
             }
 
@@ -122,7 +124,7 @@ void print_sensor_data(void* context, uint8_t sensortype, uint64_t timestamp, co
 
             err_code = storage_write(FILE_TYPE_GYRO, &imu_buffer[GYRO][active_buffer[GYRO]],
                                      sizeof(imu_sample_t) * IMU_BUFFER_SIZE);
-            if (err_code != 0) {
+            if (err_code < 0) {
                 LOG_ERR("Failed to write gyro data to storage: %d", err_code);
             }
 
@@ -138,14 +140,14 @@ void print_sensor_data(void* context, uint8_t sensortype, uint64_t timestamp, co
 
             if (count[MAG] < IMU_BUFFER_SIZE) break;
 
-			err_code = storage_write(FILE_TYPE_MAGNETO, &imu_buffer[MAG][active_buffer[MAG]],
-									 sizeof(imu_sample_t) * IMU_BUFFER_SIZE);
-			if (err_code != 0) {
-				LOG_ERR("Failed to write magneto data to storage: %d", err_code);
-			}
+            err_code = storage_write(FILE_TYPE_MAGNETO, &imu_buffer[MAG][active_buffer[MAG]],
+                                     sizeof(imu_sample_t) * IMU_BUFFER_SIZE);
+            if (err_code < 0) {
+                LOG_ERR("Failed to write magneto data to storage: %d", err_code);
+            }
 
-			sample_to_gui_mag = sample;
-			active_buffer[MAG] = !active_buffer[MAG];
+            sample_to_gui_mag = sample;
+            active_buffer[MAG] = !active_buffer[MAG];
             count[MAG] = 0;
             break;
 
@@ -158,12 +160,13 @@ void print_sensor_data(void* context, uint8_t sensortype, uint64_t timestamp, co
 
             if (count[ROTATION_VECTOR] < IMU_BUFFER_SIZE) break;
 
-			err_code = storage_write(FILE_TYPE_ROTATION, &imu_buffer[ROTATION_VECTOR][active_buffer[ROTATION_VECTOR]],
-									 sizeof(imu_sample_t) * IMU_BUFFER_SIZE);
-			if (err_code != 0) {
-				LOG_ERR("Failed to write rotation data to storage: %d", err_code);
-			}
-			sample_to_gui_rot = sample;
+            err_code = storage_write(FILE_TYPE_ROTATION,
+                                     &imu_buffer[ROTATION_VECTOR][active_buffer[ROTATION_VECTOR]],
+                                     sizeof(imu_sample_t) * IMU_BUFFER_SIZE);
+            if (err_code < 0) {
+                LOG_ERR("Failed to write rotation data to storage: %d", err_code);
+            }
+            sample_to_gui_rot = sample;
             active_buffer[ROTATION_VECTOR] = !active_buffer[ROTATION_VECTOR];
             count[ROTATION_VECTOR] = 0;
             break;
@@ -334,7 +337,10 @@ int icm20948_init(void) {
     uint32_t err;
 
     err = imu_i2c_init();
-    if (err) return err;
+    if (err) {
+        return err;
+    }
+    LOG_INF("I2C initialized successfully");
 
     /*
      * Initialize icm20948 serif structure
@@ -349,12 +355,24 @@ int icm20948_init(void) {
 
     inv_icm20948_reset_states(&icm_device, &icm20948_serif);
 
+    LOG_INF("ICM20948 before sensor setup successfully");
+
     err = icm20948_sensor_setup();
-    if (err) return err;
+    if (err) {
+        LOG_ERR("Failed to setup ICM20948 sensor: %d", err);
+        return err;
+    }
+    LOG_INF("ICM20948 sensor setup successfully");
 
     err = icm20948_run_selftest();
-    if (err) return err;
+    if (err) {
+        LOG_ERR("Failed to run ICM20948 self-test: %d", err);
+        return err;
+    }
+    LOG_INF("ICM20948 after self-test setup successfully");
     inv_icm20948_set_offset(&icm_device, unscaled_bias);
+
+    LOG_INF("ICM20948 initialized successfully");
 
     return 0;
 }

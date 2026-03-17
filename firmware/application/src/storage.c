@@ -33,10 +33,12 @@ struct file_info {
 struct file_info file_info_table[] = {
     {.type = FILE_TYPE_PROXIMITY, .status = MB_FILE_STATUS_INACTIVE, .ret_last = 0, .file = {}},
     {.type = FILE_TYPE_AUDIO, .status = MB_FILE_STATUS_INACTIVE, .ret_last = 0, .file = {}},
+    {.type = FILE_TYPE_AUDIO_METADATA, .status = MB_FILE_STATUS_INACTIVE, .ret_last = 0, .file = {}},
     {.type = FILE_TYPE_TIMESYNC, .status = MB_FILE_STATUS_INACTIVE, .ret_last = 0, .file = {}},
-    //{.type = FILE_TYPE_ACCEL, .status = MB_FILE_STATUS_INACTIVE, .ret_last = 0, .file = {}},
-    //{.type = FILE_TYPE_GYRO, .status = MB_FILE_STATUS_INACTIVE, .ret_last = 0, .file = {}},
-    //{.type = FILE_TYPE_MAGNETO, .status = MB_FILE_STATUS_INACTIVE, .ret_last = 0, .file = {}},
+    {.type = FILE_TYPE_ACCEL, .status = MB_FILE_STATUS_INACTIVE, .ret_last = 0, .file = {}},
+    {.type = FILE_TYPE_GYRO, .status = MB_FILE_STATUS_INACTIVE, .ret_last = 0, .file = {}},
+    {.type = FILE_TYPE_MAGNETO, .status = MB_FILE_STATUS_INACTIVE, .ret_last = 0, .file = {}},
+    {.type = FILE_TYPE_ROTATION, .status = MB_FILE_STATUS_INACTIVE, .ret_last = 0, .file = {}},
 };
 
 #define FILE_COUNT (sizeof(file_info_table) / (sizeof(struct file_info)))
@@ -67,34 +69,42 @@ static void storage_update_status() {
     }
 }
 
-K_THREAD_STACK_DEFINE(storage_sync_thread_stack, 1024);
-struct k_thread storage_sync_thread_data;
-void storage_sync_thread(void* p1, void* p2, void* p3) {
-    while (true) {
-        k_msleep(100);
-        if (k_mutex_lock(&storage_mutex, K_MSEC(20)) != 0) {
-            LOG_ERR("could not acquire storage mutex, sync thread");
-            continue;
-        }
+static void storage_sync_work_handler(struct k_work* work);
+static void storage_sync_timer_handler(struct k_timer* timer);
 
-        if ((storage_status != MB_STORAGE_STATUS_INIT_OK_ACTIVE) &&
-            (storage_status != MB_STORAGE_STATUS_INIT_OK_INACTIVE)) {
-            LOG_INF("exiting sync thread");
-            k_mutex_unlock(&storage_mutex);
-            return;
-        }
-        for (int i = 0; i < FILE_COUNT; i++) {
-            if (file_info_table[i].status == MB_FILE_STATUS_ACTIVE) {
-                int ret = fs_sync(&file_info_table[i].file);
-                if (ret < 0) {
-                    file_info_table[i].status = MB_FILE_STATUS_ERR;
-                    file_info_table[i].ret_last = ret;
-                }
+K_WORK_DEFINE(storage_sync_work, storage_sync_work_handler);
+K_TIMER_DEFINE(storage_sync_timer, storage_sync_timer_handler, NULL);
+
+static void storage_sync_work_handler(struct k_work* work) {
+    (void)work;
+
+    if (k_mutex_lock(&storage_mutex, K_FOREVER) != 0) {
+        LOG_ERR("could not acquire storage mutex, sync work");
+        return;
+    }
+
+    if ((storage_status != MB_STORAGE_STATUS_INIT_OK_ACTIVE) &&
+        (storage_status != MB_STORAGE_STATUS_INIT_OK_INACTIVE)) {
+        k_mutex_unlock(&storage_mutex);
+        return;
+    }
+
+    for (int i = 0; i < FILE_COUNT; i++) {
+        if (file_info_table[i].status == MB_FILE_STATUS_ACTIVE) {
+            int ret = fs_sync(&file_info_table[i].file);
+            if (ret < 0) {
+                file_info_table[i].status = MB_FILE_STATUS_ERR;
+                file_info_table[i].ret_last = ret;
             }
         }
-
-        k_mutex_unlock(&storage_mutex);
     }
+
+    k_mutex_unlock(&storage_mutex);
+}
+
+static void storage_sync_timer_handler(struct k_timer* timer) {
+    (void)timer;
+    (void)k_work_submit(&storage_sync_work);
 }
 
 int storage_init_fs() {
@@ -119,10 +129,10 @@ int storage_init_fs() {
     }
     k_mutex_unlock(&storage_mutex);
 
-    memset(&storage_sync_thread_data, 0, sizeof(struct k_thread));
-    k_thread_create(&storage_sync_thread_data, storage_sync_thread_stack,
-                    K_THREAD_STACK_SIZEOF(storage_sync_thread_stack), storage_sync_thread, NULL,
-                    NULL, NULL, 5, 0, K_NO_WAIT);
+    if ((storage_status == MB_STORAGE_STATUS_INIT_OK_ACTIVE) ||
+        (storage_status == MB_STORAGE_STATUS_INIT_OK_INACTIVE)) {
+        k_timer_start(&storage_sync_timer, K_MSEC(100), K_MSEC(100));
+    }
 
     if (res == FR_OK) {
         storage_init_experiment(0);
@@ -137,6 +147,10 @@ int storage_deinit_fs() {
         LOG_ERR("Cannot deinit fs while sampling is ongoing");
         res = -EACCES;
     } else {
+        k_timer_stop(&storage_sync_timer);
+        struct k_work_sync storage_sync_work_sync;
+        (void)k_work_cancel_sync(&storage_sync_work, &storage_sync_work_sync);
+
         storage_status = MB_STORAGE_STATUS_UNINIT;
         if (k_mutex_lock(&storage_mutex, K_FOREVER) != 0) {
             LOG_ERR("could not acquire storage mutex to deinit fs");
@@ -144,10 +158,8 @@ int storage_deinit_fs() {
         }
 
         res = fs_unmount(&mp);
-        LOG_INF("Disk unmounted 1");
+        LOG_INF("Disk unmounted");
         k_mutex_unlock(&storage_mutex);
-        k_thread_join(&storage_sync_thread_data, K_FOREVER);
-        LOG_INF("Disk unmounted 2");
     }
     return res;
 }
@@ -251,9 +263,11 @@ int storage_init_sample_file(enum mb_file_type file_type, int sample_iter) {
     const char* fmt_prox = "%s/PROX%d";
     const char* fmt_sync = "%s/SYNC%d";
     const char* fmt_mic = "%s/MIC%d";
+    const char* fmt_mic_meta = "%s/MIC%d.m";
     const char* fmt_accel = "%s/ACC%d";
     const char* fmt_gyro = "%s/GYR%d";
     const char* fmt_magneto = "%s/MAG%d";
+    const char* fmt_rotation = "%s/ROT%d";
 
     const char* dummy = "DUMMY";
     const char* fmt = dummy;
@@ -267,6 +281,9 @@ int storage_init_sample_file(enum mb_file_type file_type, int sample_iter) {
         case (FILE_TYPE_AUDIO): {
             fmt = fmt_mic;
         } break;
+        case (FILE_TYPE_AUDIO_METADATA): {
+            fmt = fmt_mic_meta;
+        } break;
         case (FILE_TYPE_ACCEL): {
             fmt = fmt_accel;
         } break;
@@ -275,6 +292,9 @@ int storage_init_sample_file(enum mb_file_type file_type, int sample_iter) {
         } break;
         case (FILE_TYPE_MAGNETO): {
             fmt = fmt_magneto;
+        } break;
+        case (FILE_TYPE_ROTATION): {
+            fmt = fmt_rotation;
         } break;
         default: {
             return -EINVAL;

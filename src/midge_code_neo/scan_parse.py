@@ -1,6 +1,5 @@
 import argparse
 import pathlib
-from datetime import datetime
 
 from midge_badge_framework.files import ScanFileEntry
 from midge_badge_framework.protocol import mingle_midge_batt_mv_to_percent
@@ -36,7 +35,7 @@ def main():
                 badge_id = adv_data.badge_assignment.id.badge
                 batt_p = mingle_midge_batt_mv_to_percent(adv_data.battery_mv)
                 active_sensors = adv_data.active_sensor_bitflags
-                timestamp = datetime.fromtimestamp(a.timestamp / 1000.0).isoformat()
+                timestamp = str(a.timestamp)
                 output_file.write(
                     f"{mac_address_to_str(a.mac_address):16},{group:2},{badge_id:4},{a.rssi:3},{batt_p:3},{active_sensors:05b},{timestamp}\n"
                 )

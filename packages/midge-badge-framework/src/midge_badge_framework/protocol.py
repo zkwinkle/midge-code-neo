@@ -234,6 +234,43 @@ class CmdEraseSDResponse(MidgeBadgeCommand):
         return b"H"
 
 
+class CmdStartIMURequest(MidgeBadgeCommand):
+    _pack_ = 1
+    _fields_ = [
+        ("sample_id", c_uint16),
+        ("acc_fsr", c_uint16),
+        ("gyr_fsr", c_uint16),
+        ("datarate", c_uint16),
+    ]
+
+    def id() -> bytes:
+        return b"I"
+
+
+class CmdStartIMUResponse(MidgeBadgeCommand):
+    _pack_ = 1
+    _fields_ = [("status_code", c_int32)]
+
+    def id() -> bytes:
+        return b"I"
+
+
+class CmdStopIMURequest(MidgeBadgeCommand):
+    _pack_ = 1
+    _fields_ = [("reserved", c_uint16)]
+
+    def id() -> bytes:
+        return b"J"
+
+
+class CmdStopIMUResponse(MidgeBadgeCommand):
+    _pack_ = 1
+    _fields_ = [("status_code", c_int32)]
+
+    def id() -> bytes:
+        return b"J"
+
+
 # DATA
 CMD_RESPONSES: list[MidgeBadgeCommand] = [
     CmdSetupExperimentResponse,
@@ -244,6 +281,8 @@ CMD_RESPONSES: list[MidgeBadgeCommand] = [
     CmdStartScanResponse,
     CmdStopScanResponse,
     CmdEraseSDResponse,
+    CmdStartIMUResponse,
+    CmdStopIMUResponse,
 ]
 
 SOT = b"#"

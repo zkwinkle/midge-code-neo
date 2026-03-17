@@ -4,6 +4,7 @@
 #include <zephyr/sys/util.h>
 
 #include "audio.h"
+#include "imu.h"
 #include "battery_charge.h"
 #include "cmd_processor.h"
 #include "privacy_switch.h"
@@ -31,7 +32,7 @@ static int run_inits(const struct init_item* items, size_t n) {
     return ret;
 }
 
-int main() {
+ int main() {
     int ret = led_init();
     if (ret < 0) {
         LOG_ERR("Failed to initialize LED");
@@ -44,6 +45,7 @@ int main() {
         {audio_sensor_init,  "audio sensor"},
         {switch_sensor_init,  "switch sensor"},
         {proximity_sensor_init,  "proximity sensor"},
+        {imu_sensor_init,  "IMU sensor"},
         {cmd_processor_init,  "command processor"},
     };
 

@@ -15,20 +15,21 @@
 #define INV20948_ABS(x) (((x) < 0) ? -(x) : (x))
 
 typedef enum{
-	ACCEL,
+	ACCEL=0,
 //	ACCEL_RAW,
-	GYRO,
+	GYRO=1,
 //	GYRO_RAW,
-	MAG,
+	MAG=2,
 //	MAG_RAW,
-	ROTATION_VECTOR,
+	ROTATION_VECTOR=3,
 //	GAME_ROTATION_VECTOR,
 //	GEOMAGNETIC_ROTATION_VECTOR,
-	MAX_IMU_SOURCES
 } imu_source_t;
 
+#define MAX_IMU_SOURCES 4
 
-#define IMU_BUFFER_SIZE 64
+
+#define IMU_BUFFER_SIZE 32
 
 typedef struct {
 	uint64_t timestamp;

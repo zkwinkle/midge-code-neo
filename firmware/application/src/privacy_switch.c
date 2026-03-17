@@ -20,8 +20,7 @@ static struct gpio_callback sw_callback_data;
 
 K_MUTEX_DEFINE(switch_mutex);
 
-bool timer_launched = false;
-struct k_timer switch_read_timer;
+bool debouncing = false;
 enum privacy_sw_pos sw_pos = PRIVACY_SWITCH_POS_OFF;
 
 void update_privacy_sw_pos() {
@@ -43,21 +42,23 @@ void update_privacy_sw_pos() {
     }
 }
 
-void switch_read_state(struct k_timer* timer) {
+struct k_work_delayable switch_read_work;
+void switch_read_work_handler(struct k_work* work) {
     if (k_mutex_lock(&switch_mutex, K_NO_WAIT) == 0) {
         update_privacy_sw_pos();
-        timer_launched = false;
+        debouncing = false;
         k_mutex_unlock(&switch_mutex);
     }
-    (void)timer;
 }
 
 void sw_pos_changed(const struct device* dev, struct gpio_callback* cb, uint32_t pins) {
     if (k_mutex_lock(&switch_mutex, K_NO_WAIT) == 0) {
-        if (!timer_launched) {
-            timer_launched = true;
+        if (!debouncing) {
+            debouncing = true;
         }
-        k_timer_start(&switch_read_timer, K_MSEC(100), K_NO_WAIT);
+        memset(&switch_read_work, 0, sizeof(switch_read_work));
+        k_work_init_delayable(&switch_read_work, switch_read_work_handler);
+        k_work_schedule(&switch_read_work, K_MSEC(200));
         k_mutex_unlock(&switch_mutex);
     }
 }
@@ -75,13 +76,11 @@ int switch_sensor_init() {
         (gpio_pin_interrupt_configure_dt(&sw_low, GPIO_INT_EDGE_TO_ACTIVE) == 0) &&
         (gpio_pin_interrupt_configure_dt(&sw_high, GPIO_INT_EDGE_TO_ACTIVE) == 0);
 
-    k_timer_init(&switch_read_timer, switch_read_state, NULL);
-
     gpio_init_callback(&sw_callback_data, sw_pos_changed,
                        BIT(sw_off.pin) | BIT(sw_low.pin) | BIT(sw_high.pin));
     int add_callback_success = gpio_add_callback(sw_off.port, &sw_callback_data);  // assume the same port
 
-    if (!gpios_ready || !gpios_config_done || !gpios_irq_config_success || !add_callback_success) {
+    if (!gpios_ready || !gpios_config_done || !gpios_irq_config_success || (add_callback_success!=0)) {
         LOG_ERR("Error: Failed during GPIO initialization");
         return -ENXIO;
     }

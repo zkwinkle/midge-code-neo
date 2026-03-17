@@ -10,14 +10,20 @@ from midge_badge_framework.protocol import (
     CmdEraseSDRequest,
     CmdGetFWVersionRequest,
     CmdSetupExperimentRequest,
+    CmdStartIMURequest,
     CmdStartMicRequest,
     CmdStartScanRequest,
     CmdStatusRequest,
+    CmdStopIMURequest,
     CmdStopMicRequest,
     CmdStopScanRequest,
     MidgeBadgeCommand,
     get_bitfield_width,
 )
+
+DEFAULT_IMU_ACC_FSR = 4
+DEFAULT_IMU_GYR_FSR = 1000
+DEFAULT_IMU_DATARATE = 50
 
 
 class MidgeBadgeConsole(cmd.Cmd):
@@ -55,6 +61,7 @@ class MidgeBadgeConsole(cmd.Cmd):
             print("Connection successfully started!")
             self.clients.append(client)
             self.active_client = client
+            self.do_status("")
         else:
             print("Error: Failed to establish connection")
 
@@ -224,6 +231,60 @@ class MidgeBadgeConsole(cmd.Cmd):
             erase_sd
         """
         request = CmdEraseSDRequest()
+        self.__common_cmd_execute(request)
+
+    def do_start_imu(self, arg):
+        """
+        Issue a "start-imu" command that tells the active Midge Badge to start IMU sampling
+        Usage:
+            start_imu <sample_id> <acc_fsr> <gyr_fsr> <datarate>
+        """
+        args = arg.split(" ")
+        if len(args) != 4:
+            print("Error: Invalid syntax, expected 4 arguments")
+            return
+
+        try:
+            sample_id = int(args[0], 0)
+            acc_fsr = int(args[1], 0)
+            gyr_fsr = int(args[2], 0)
+            datarate = int(args[3], 0)
+        except Exception as _:
+            print("Error: Invalid syntax, arguments must be numbers")
+            return
+
+        request = CmdStartIMURequest(sample_id, acc_fsr, gyr_fsr, datarate)
+        self.__common_cmd_execute(request)
+
+    def do_start_imu_default(self, arg):
+        """
+        Issue a "start-imu" command with default IMU settings
+        Usage:
+            start_imu_default <sample_id>
+        Defaults:
+            acc_fsr=4, gyr_fsr=1000, datarate=50
+        """
+        try:
+            sample_id = int(arg, 0)
+        except Exception as _:
+            print("Error: Invalid syntax, <sample_id> must be a number")
+            return
+
+        request = CmdStartIMURequest(
+            sample_id,
+            DEFAULT_IMU_ACC_FSR,
+            DEFAULT_IMU_GYR_FSR,
+            DEFAULT_IMU_DATARATE,
+        )
+        self.__common_cmd_execute(request)
+
+    def do_stop_imu(self, _):
+        """
+        Issue a "stop-imu" command that tells the active Midge Badge to stop IMU sampling
+        Usage:
+            stop_imu
+        """
+        request = CmdStopIMURequest()
         self.__common_cmd_execute(request)
 
     def do_exit(self, _):

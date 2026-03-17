@@ -96,4 +96,23 @@ struct __attribute__((packed)) CmdEraseSDResponse{
   int32_t status_code;
 };
 
+struct __attribute__((packed)) CmdStartIMURequest{
+  uint16_t sample_id;
+  uint16_t acc_fsr;
+  uint16_t gyr_fsr;
+  uint16_t datarate;
+};
+
+struct __attribute__((packed)) CmdStartIMUResponse{
+  int32_t status_code;
+};
+
+struct __attribute__((packed)) CmdStopIMURequest{
+  uint16_t reserved;
+};
+
+struct __attribute__((packed)) CmdStopIMUResponse{
+  int32_t status_code;
+};
+
 #endif

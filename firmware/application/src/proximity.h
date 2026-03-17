@@ -13,4 +13,8 @@ int proximity_sensor_start(int sample_iter);
 
 int proximity_sensor_stop();
 
+int cmd_scan_start(uint8_t* data);
+
+int cmd_scan_stop(uint8_t* data);
+
 #endif

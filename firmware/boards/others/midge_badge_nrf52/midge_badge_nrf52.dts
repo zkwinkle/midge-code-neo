@@ -127,12 +127,12 @@
 	status = "okay";
 };
 
-&spi0 {
+&spi1 {
 	compatible = "nordic,nrf-spim";
 	status = "okay";
 	pinctrl-names = "default", "sleep";
-	pinctrl-0 = <&spi0_default>;
-	pinctrl-1 = <&spi0_sleep>;
+	pinctrl-0 = <&spi1_default>;
+	pinctrl-1 = <&spi1_sleep>;
 	cs-gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;
 	anomaly-58-workaround;
 
@@ -156,13 +156,16 @@ dmic_dev: &pdm0 {
 	clock-source = "PCLK32M_HFXO";
 };
 
-&i2c1 {
+&i2c0 {
 	compatible = "nordic,nrf-twim";
 	status = "okay";
-	pinctrl-0 = <&i2c1_default>;
-	pinctrl-1 = <&i2c1_sleep>;
+	pinctrl-0 = <&i2c0_default>;
+	pinctrl-1 = <&i2c0_sleep>;
 	pinctrl-names = "default", "sleep";
 	clock-frequency = <400000>;
+	zephyr,concat-buf-size = <255>;
+	zephyr,flash-buf-max-size = <255>;
+
 	imu: icm20948@68 {
 		compatible = "invensense,i2c-device";
 		status = "okay";

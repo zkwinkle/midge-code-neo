@@ -8,9 +8,11 @@
 #include <zephyr/bluetooth/services/nus.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/util.h>
 
 #include "audio.h"
 #include "battery_charge.h"
+#include "imu.h"
 #include "midge_protocol.h"
 #include "proximity.h"
 #include "storage.h"
@@ -80,41 +82,6 @@ int cmd_get_fw_version(uint8_t* data) {
     return 0;
 }
 
-int cmd_mic_start(uint8_t* data) {
-    struct CmdStartMicRequest* req_data = (struct CmdStartMicRequest*)data;
-    int ret = audio_sensor_start(req_data->sample_id, req_data->mode);
-
-    struct CmdStartMicResponse* resp_data = (struct CmdStartMicResponse*)data;
-    resp_data->status_code = ret;
-    return ret;
-}
-
-int cmd_mic_stop(uint8_t* data) {
-    // struct CmdStartMicRequest* req_data = (struct CmdStartMicRequest*)data;
-    struct CmdStartMicResponse* resp_data = (struct CmdStartMicResponse*)data;
-    int ret = audio_sensor_stop();
-    resp_data->status_code = ret;
-    return ret;
-}
-
-int cmd_scan_start(uint8_t* data) {
-    struct CmdStartScanRequest* req_data = (struct CmdStartScanRequest*)data;
-    struct CmdStartScanResponse* resp_data = (struct CmdStartScanResponse*)data;
-    int ret = proximity_sensor_change_config(req_data->interval, req_data->window);
-    if (ret == 0) {
-        ret = proximity_sensor_start(req_data->sample_id);
-    }
-    resp_data->status_code = ret;
-    return ret;
-}
-
-int cmd_scan_stop(uint8_t* data) {
-    // struct CmdStopScanRequest* req_data = (struct CmdStopScanRequest*)data;
-    struct CmdStopScanResponse* resp_data = (struct CmdStopScanResponse*)data;
-    int ret = proximity_sensor_stop();
-    resp_data->status_code = ret;
-    return ret;
-}
 
 int cmd_erase_sd(uint8_t* data) {
     // struct CmdEraseSDRequest* req_data = (struct CmdEraseSDRequest*)data;
@@ -141,7 +108,12 @@ struct cmd_processor_lut_entry commands[] = {
     {'E', sizeof(struct CmdStopMicRequest), sizeof(struct CmdStopMicResponse), cmd_mic_stop},
     {'F', sizeof(struct CmdStartScanRequest), sizeof(struct CmdStartScanResponse), cmd_scan_start},
     {'G', sizeof(struct CmdStopScanRequest), sizeof(struct CmdStopScanResponse), cmd_scan_stop},
-    {'H', sizeof(struct CmdEraseSDRequest), sizeof(struct CmdEraseSDResponse), cmd_erase_sd}};
+    {'H', sizeof(struct CmdEraseSDRequest), sizeof(struct CmdEraseSDResponse), cmd_erase_sd},
+    {'I', sizeof(struct CmdStartIMURequest), sizeof(struct CmdStartIMUResponse), cmd_start_imu},
+    {'J', sizeof(struct CmdStopIMURequest), sizeof(struct CmdStopIMUResponse), cmd_stop_imu}};
+    // get SD space command missing
+    // file transfer commands missing
+
 
 #define COMMAND_COUNT sizeof(commands)
 #define MAX_CMD_DATA_SZ 128

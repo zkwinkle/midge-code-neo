@@ -19,16 +19,16 @@ enum mb_storage_status {
 enum mb_file_type {
     FILE_TYPE_PROXIMITY = 0,
     FILE_TYPE_AUDIO = 1,
-    FILE_TYPE_TIMESYNC = 2,
+    FILE_TYPE_AUDIO_METADATA = 2,  //?< Timestamps per sample, or just register dropped samples?
     FILE_TYPE_ACCEL = 3,
     FILE_TYPE_GYRO = 4,
     FILE_TYPE_MAGNETO = 5,
     FILE_TYPE_ROTATION = 6,
+    FILE_TYPE_TIMESYNC = 7,
 
     // update prj.conf if this is changed to increase CONFIG_FS_FATFS_NUM_FILES
-    FILE_TYPE_MAX = 6,
+    FILE_TYPE_MAX = 7,
 };
-
 
 int storage_init_fs();
 
@@ -50,6 +50,15 @@ int storage_init_experiment(int id);
  */
 int storage_erase(char* path);
 
+/**
+ * @brief
+ *
+ * @param file_type
+ * @param sample_iter
+ * @param name_data Data defined by the caller to control naming of the file, e.g. audio mono/stereo
+ * naming info
+ * @return int
+ */
 int storage_init_sample_file(enum mb_file_type file_type, int sample_iter);
 
 uint16_t storage_get_active_sensor_bitflags();
