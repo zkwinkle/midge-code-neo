@@ -16,7 +16,7 @@ execute_process(
 # Add the commit hash as a compile definition
 add_compile_definitions(FW_VERSION="${HATCH_VERSION}")
 
-add_subdirectory(src/imu_drv_closed)
+add_subdirectory(src/imu_drivers)
 
 target_sources(app PRIVATE
     src/main.c

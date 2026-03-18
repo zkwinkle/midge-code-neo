@@ -5,10 +5,16 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/util.h>
 
-#include "ICM20948_driver_interface.h"
 #include "midge_protocol.h"
 #include "storage.h"
 #include "utility.h"
+
+#if CONFIG_MIDGE_CODE_IMU_ICM20948_USE_CLOSED_DRIVER
+#include "ICM20948_driver_interface.h"
+#else
+#error "No IMU driver defined"
+#endif
+
 
 LOG_MODULE_REGISTER(imu);
 

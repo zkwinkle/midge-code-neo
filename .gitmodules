@@ -1,3 +1,3 @@
 [submodule "firmware/application/src/imu_drv_closed/tdk_driver"]
-	path = firmware/application/src/imu_drv_closed/tdk_driver
+	path = firmware/application/src/imu_drivers/icm20948/closed_drv/tdk_eMD_drv
 	url = git@github.com:TUDelft-SPC-Lab/midge-icm-20948-driver.git

@@ -1,0 +1,7 @@
+if(CONFIG_MIDGE_CODE_IMU_ICM20948_USE_CLOSED_DRIVER)
+    message(STATUS "Using closed-source ICM20948 driver")
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/closed_drv)
+else()
+    message(STATUS "Using Zephyr ICM20948 driver")
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/zephyr_drv)
+endif()
