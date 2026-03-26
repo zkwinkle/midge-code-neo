@@ -1,13 +1,18 @@
 import asyncio
 import cmd
+import logging
 import time
+from ctypes import c_uint8
 from threading import Thread
 
 from midge_badge_framework.connection import MidgeBadgeClient
 from midge_badge_framework.protocol import (
+    INTERFACE_MAX_FILE_NAME,
     BadgeAssignment,
     BadgeID,
     CmdEraseSDRequest,
+    CmdGetFileCRC32Request,
+    CmdGetFreeSDSpaceRequest,
     CmdGetFWVersionRequest,
     CmdSetupExperimentRequest,
     CmdStartIMURequest,
@@ -24,6 +29,8 @@ from midge_badge_framework.protocol import (
 DEFAULT_IMU_ACC_FSR = 4
 DEFAULT_IMU_GYR_FSR = 1000
 DEFAULT_IMU_DATARATE = 50
+
+logging.basicConfig(level=logging.INFO)
 
 
 class MidgeBadgeConsole(cmd.Cmd):
@@ -109,7 +116,6 @@ class MidgeBadgeConsole(cmd.Cmd):
                 print("Warning: No active clients, connect to a new client before sending another command")
 
         else:
-            print(f"Sent {self.active_client.get_address()} the request: {request}")
             self.active_client.execute_command_log_resp(request)
 
     def do_setup_experiment(self, arg):
@@ -123,7 +129,7 @@ class MidgeBadgeConsole(cmd.Cmd):
         Note: group_id, badge_id and experiment_id must be numbers.
               group_id must be between 0 and 15, badge_id must be between 0 and 4095
         """
-        args = arg.split(" ")
+        args = arg.split()
         if len(args) != 3:
             print("Error: Invalid syntax, expected 3 arguments")
             return
@@ -178,12 +184,12 @@ class MidgeBadgeConsole(cmd.Cmd):
         Usage:
             start_mic <sample_id> <mode>
         """
-        args = arg.split(" ")
+        args = arg.split()
         try:
             id = int(args[0], 0)
             mode = int(args[1], 0)
         except Exception as _:
-            print("Error: Invalid syntax, <sample_id> must be a number")
+            print("Error: Invalid syntax, <sample_id> and <mode> must be numbers")
             return
 
         request = CmdStartMicRequest(id, mode)
@@ -224,22 +230,13 @@ class MidgeBadgeConsole(cmd.Cmd):
         request = CmdStopScanRequest()
         self.__common_cmd_execute(request)
 
-    def do_erase_sd(self, _):
-        """
-        Issue a "erase-sd" command which will re-format the sd card in the Midge Badge
-        Usage:
-            erase_sd
-        """
-        request = CmdEraseSDRequest()
-        self.__common_cmd_execute(request)
-
     def do_start_imu(self, arg):
         """
         Issue a "start-imu" command that tells the active Midge Badge to start IMU sampling
         Usage:
             start_imu <sample_id> <acc_fsr> <gyr_fsr> <datarate>
         """
-        args = arg.split(" ")
+        args = arg.split()
         if len(args) != 4:
             print("Error: Invalid syntax, expected 4 arguments")
             return
@@ -286,6 +283,96 @@ class MidgeBadgeConsole(cmd.Cmd):
         """
         request = CmdStopIMURequest()
         self.__common_cmd_execute(request)
+
+    def do_erase_sd(self, _):
+        """
+        Issue a "erase-sd" command which will re-format the sd card in the Midge Badge
+        Usage:
+            erase_sd
+        """
+        request = CmdEraseSDRequest()
+        self.__common_cmd_execute(request)
+
+    def do_get_free_sd_space(self, _):
+        """
+        Issue a "get-free-sd-space" command that requests the Midge Badge to send back the amount of free space on its
+        sd card in bytes
+        Usage:
+            get_free_sd_space
+        """
+        request = CmdGetFreeSDSpaceRequest()
+        self.__common_cmd_execute(request)
+
+    def do_get_file_crc32(self, arg):
+        """
+        Issue a "get-file-crc32" command that requests the crc32 of a file stored on the active Midge Badge's sd card
+        Usage:
+            get_file_crc32 <path_on_badge>
+
+        Note: <path_on_badge> should be the full path as listed by the "list_files" command, including the leading "/"
+        """
+        path = arg.strip()
+        if path == "":
+            print("Error: Invalid syntax, expected 1 argument")
+            return
+
+        if self.active_client is None:
+            print("Error: No selected client")
+            return
+
+        path_bytes = path.encode("utf-8")
+        if len(path_bytes) >= INTERFACE_MAX_FILE_NAME:
+            print("Error: Path is too long")
+            return
+        path_type = c_uint8 * INTERFACE_MAX_FILE_NAME
+        path_bytes = path_type(*path_bytes)
+        request = CmdGetFileCRC32Request(path_bytes)
+        self.active_client.execute_command_log_resp(request)
+
+    def do_list_files(self, _):
+        """
+        Issue a series of "get-file-index-info" commands to get the list of files stored on the active Midge Badge's
+        sd card
+        Usage:
+            list_files
+        """
+        if self.active_client is None:
+            print("Error: No selected client")
+            return
+        if not self.active_client.get_connected():
+            print("Error: Connection of selected client was closed")
+            self.clients.remove(self.active_client)
+            if self.clients != []:
+                self.active_client = self.clients[0]
+                print(f"Switched active client to {self.active_client.address}")
+            else:
+                print("Warning: No active clients, connect to a new client before sending another command")
+                return
+
+        self.active_client.list_files()
+
+    def do_download_file(self, arg):
+        """
+        Issue a series of "get-file-chunk" commands to download a file stored on the active Midge Badge's sd card
+        Usage:
+            download_file <path_on_badge> <output_file>
+
+        Note: <path_on_badge> should be the full path as listed by the "list_files" command, including the leading "/"
+        """
+
+        args = arg.split()
+        if len(args) != 2:
+            print("Error: Invalid syntax, expected 2 arguments")
+            return
+
+        path = args[0]
+        outfile = args[1]
+
+        if self.active_client is None:
+            print("Error: No selected client")
+            return
+
+        self.active_client.download_file(path, outfile)
 
     def do_exit(self, _):
         "exit program"
