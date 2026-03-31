@@ -13,6 +13,9 @@ execute_process(
     ERROR_QUIET
 )
 
+target_include_directories(app PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
 # Add the commit hash as a compile definition
 add_compile_definitions(FW_VERSION="${HATCH_VERSION}")
 
