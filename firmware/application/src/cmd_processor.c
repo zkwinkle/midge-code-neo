@@ -39,28 +39,21 @@ int cmd_setup_experiment(uint8_t* data) {
 int cmd_status(uint8_t* data) {
     LOG_INF("received status message");
     struct cmd_status_request* req_data = (struct cmd_status_request*)data;
-
-    uint64_t current_interpolation = time_control_get_timestamp();
-    uint64_t delta = current_interpolation > req_data->millis_since_epoch
-                         ? current_interpolation - req_data->millis_since_epoch
-                         : req_data->millis_since_epoch - current_interpolation;
-
-    int ret = time_control_update(req_data->millis_since_epoch);
+    int64_t error = 0;
+    int ret = time_control_sync(req_data->millis_since_epoch, &error);
     if (ret < 0) {
-        LOG_ERR("Failed to perform the time sync");
+        LOG_ERR("time sync failed with error %d", ret);
     }
-
     int16_t mv = 0;
     ret = battery_charge_get_mv(&mv);
     if (ret < 0) {
         LOG_ERR("Failed to read battery voltage");
     }
-
     struct cmd_status_response* resp_data = (struct cmd_status_response*)data;
     memset(resp_data, 0, sizeof(struct cmd_status_response));
     resp_data->badge_assignment = advertised_data.badge_assignment;
-    resp_data->sync_status = 0;
-    resp_data->sync_delta_ms = delta;
+    resp_data->sync_status = time_control_get_status();
+    resp_data->sync_error_ms = error;
     resp_data->audio_init_status = audio_sensor_get_status();
     LOG_INF("audio sensor get status");
     resp_data->battery_millivolts = mv;

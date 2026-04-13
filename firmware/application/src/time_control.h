@@ -9,4 +9,8 @@ int time_control_update(uint64_t ref_ms);
 
 uint64_t time_control_get_timestamp();
 
+int time_control_sync(uint64_t ref_ms, int64_t* error_ms);
+
+uint8_t time_control_get_status();
+
 #endif

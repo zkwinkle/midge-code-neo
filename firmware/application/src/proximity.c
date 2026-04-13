@@ -21,19 +21,8 @@ static struct bt_le_scan_param scan_param = {
     .window = 0x0010,
 };
 
-struct proximity_sensor_entry {
-    union {
-        uint8_t u8;
-        int8_t i8;
-    } rssi;
-    uint8_t mac_address[6];
-    struct custom_advertisement_data advertised_data;
-    uint64_t timestamp;
-};
-
-#define BUFFERED_SAMPLES \
-    21  // chosen so that sizeof(proximity_sensor_entry) * BUFFERED_SAMPLES is multiple of 512
-        // (sdcard block size)
+// Selected to be a bit over 512 bytes of data, to be close to sd card block size
+#define BUFFERED_SAMPLES 25
 
 static struct {
     enum {
