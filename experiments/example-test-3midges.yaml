@@ -1,0 +1,36 @@
+id: 79
+name: testlab
+description: Test of 3 simultaneous Mingle Midges
+
+params:
+  audio:
+    high_freq_hz: 20000
+    low_freq_decimation: 16  # 20kHz / 16 = 1.25kHz effective sample rate
+    channels: 1
+  imu:
+    accel_range_g: 4
+    gyro_range_dps: 1000
+    sample_rate_hz: 50
+  scan:
+    interval: 16  # N * 0.625 ms
+    window: 16  # N * 0.625 ms
+
+groups:
+  - id: 0
+    name: grains and legumes
+    description: 2 Mingle Midges in the same group
+    badges:
+      - id: 0
+        mac: E0:01:6F:87:74:E2
+        name: rice
+      - id: 1
+        mac: CD:60:EF:E6:2C:4C
+        name: beans
+
+  - id: 1
+    name: The sauces
+    description: 1 Mingle Midge in this group
+    badges:
+      - id: 0
+        mac: any  # Connect to the first Midge found during a scan
+        name: lizano
