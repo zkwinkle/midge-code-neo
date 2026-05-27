@@ -25,26 +25,23 @@ static struct bt_le_scan_param scan_param = {
 #define BUFFERED_SAMPLES 25
 
 static struct {
-    enum {
-        PROXIMITY_SENSOR_STATE_DISABLED = 0,
-        PROXIMITY_SENSOR_STATE_ACTIVE = 1,
-        PROXIMITY_SENSOR_STATE_STOP = 2,
-        PROXIMITY_SENSOR_STATE_ERR = 3,
-    } state;
+    enum sensor_state state;
     int sample_cnt;
-    struct proximity_sensor_entry buffered_samples[BUFFERED_SAMPLES];
+    int buffer_index;
+    struct proximity_sensor_entry buffered_samples[2][BUFFERED_SAMPLES];
 } sensor_data = {
-    .state = PROXIMITY_SENSOR_STATE_DISABLED,
+    .state = SENSOR_STATE_DISABLED,
     .sample_cnt = 0,
+    .buffer_index = 0,
 };
 
 int proximity_sensor_init() {
     // check bt already init
-    if (sensor_data.state != PROXIMITY_SENSOR_STATE_DISABLED) {
+    if (sensor_data.state != SENSOR_STATE_DISABLED) {
         LOG_INF("already initialized");
         return -EPERM;
     }
-    sensor_data.state = PROXIMITY_SENSOR_STATE_STOP;
+    sensor_data.state = SENSOR_STATE_STOP;
     return 0;
 }
 
@@ -56,14 +53,33 @@ int proximity_sensor_change_config(uint16_t interval, uint16_t window) {
     return 0;
 }
 
-static bool scan_data_parse(struct bt_data* data, void* advertised_data) {
-    if (data->type == BT_DATA_MANUFACTURER_DATA &&
-        data->data_len == sizeof(struct custom_advertisement_data)) {
-        memcpy(advertised_data, data->data, sizeof(struct custom_advertisement_data));
-        return false;  // stop parsing
-    } else {
-        return true;  // continue parsing
+struct scan_data_parse_out {
+    struct custom_advertisement_data* adv_data;
+    bool valid_name;
+    bool valid_adv;
+};
+
+static bool scan_data_parse(struct bt_data* data, void* out) {
+    struct scan_data_parse_out* parse_out = (struct scan_data_parse_out*)out;
+    if (data->type == BT_DATA_NAME_COMPLETE) {
+        if (strncmp((char*)data->data, CONFIG_BT_DEVICE_NAME, data->data_len) == 0) {
+            parse_out->valid_name = true;
+            return !parse_out->valid_adv;  // if adv ready, stop parsing
+        } else {
+            parse_out->valid_name = false;
+            return false;  // stop parsing, not valid
+        }
+    } else if (data->type == BT_DATA_MANUFACTURER_DATA) {
+        if (data->data_len == sizeof(struct custom_advertisement_data)) {
+            parse_out->adv_data = (struct custom_advertisement_data*)(data->data);
+            parse_out->valid_adv = true;
+            return parse_out->valid_name;  // if name ready, stop parsing
+        } else {
+            parse_out->valid_adv = false;
+            return false;
+        }
     }
+    return true;  // continue parsing
 }
 
 /**
@@ -73,9 +89,10 @@ static bool scan_data_parse(struct bt_data* data, void* advertised_data) {
  */
 static void scan_write_samples_work_handler(struct k_work* work) {
     struct simple_work_ctx* ctx = CONTAINER_OF(work, struct simple_work_ctx, work);
-    sensor_data.sample_cnt = 0;
-    ctx->ret = storage_write(FILE_TYPE_PROXIMITY, sensor_data.buffered_samples,
+    int index = (sensor_data.buffer_index + 1) % 2;
+    ctx->ret = storage_write(FILE_TYPE_PROXIMITY, sensor_data.buffered_samples[index],
                              sizeof(struct proximity_sensor_entry) * BUFFERED_SAMPLES);
+
     k_sem_give(&ctx->done);
 }
 
@@ -84,14 +101,28 @@ void scan_callback(const bt_addr_le_t* addr, int8_t rssi, uint8_t adv_type,
                    struct net_buf_simple* buf) {
     if (k_mutex_lock(&proximity_sensor_mutex, K_MSEC(50)) == 0) {
         struct proximity_sensor_entry* sample =
-            &sensor_data.buffered_samples[sensor_data.sample_cnt];
+            &sensor_data.buffered_samples[sensor_data.buffer_index][sensor_data.sample_cnt];
         sample->rssi.i8 = rssi;
         sample->timestamp = time_control_get_timestamp();
         memcpy(sample->mac_address, addr->a.val, 6);
         // obtain the advertised data
-        bt_data_parse(buf, scan_data_parse, &sample->advertised_data);
+        struct scan_data_parse_out parse_out = {
+            .adv_data = &sample->advertised_data,
+            .valid_name = false,
+            .valid_adv = false,
+        };
+        bt_data_parse(buf, scan_data_parse, &parse_out);
+        if (!parse_out.valid_name || !parse_out.valid_adv) {
+            k_mutex_unlock(&proximity_sensor_mutex);
+            return;
+        }
+        sample->advertised_data = *parse_out.adv_data;
         sensor_data.sample_cnt++;
         if (sensor_data.sample_cnt == BUFFERED_SAMPLES) {
+            sensor_data.buffer_index = (sensor_data.buffer_index + 1) % 2;
+            sensor_data.sample_cnt = 0;
+            k_mutex_unlock(&proximity_sensor_mutex);
+
             struct simple_work_ctx ctx;
             k_work_init(&ctx.work, scan_write_samples_work_handler);
             k_sem_init(&ctx.done, 0, 1);
@@ -105,8 +136,9 @@ void scan_callback(const bt_addr_le_t* addr, int8_t rssi, uint8_t adv_type,
             } else {
                 // LOG_INF("wrote %d proximity samples to storage", BUFFERED_SAMPLES);
             }
+        } else {
+            k_mutex_unlock(&proximity_sensor_mutex);
         }
-        k_mutex_unlock(&proximity_sensor_mutex);
     } else {
         LOG_ERR("failed to add sample");
     }
@@ -138,7 +170,7 @@ static void proximity_sensor_start_work_handler(struct k_work* work) {
                 LOG_ERR("FATAL: failed to close proximity sample file");
             }
         } else {
-            sensor_data.state = PROXIMITY_SENSOR_STATE_ACTIVE;
+            sensor_data.state = SENSOR_STATE_ACTIVE;
             sensor_data.sample_cnt = 0;
         }
     } while (0);
@@ -159,13 +191,14 @@ void proximity_sensor_stop_work_handler(struct k_work* work) {
 
         // write remaining data
         if (sensor_data.sample_cnt != 0) {
-            ret = storage_write(FILE_TYPE_PROXIMITY, sensor_data.buffered_samples,
+            ret = storage_write(FILE_TYPE_PROXIMITY,
+                                sensor_data.buffered_samples[sensor_data.buffer_index],
                                 sizeof(struct proximity_sensor_entry) * sensor_data.sample_cnt);
             if (ret < 0) {
                 int close_ret = storage_close(FILE_TYPE_PROXIMITY);  // ignore return
                 LOG_ERR("failed to write remaining proximity samples, write:%d close:%d", ret,
                         close_ret);
-                sensor_data.state = PROXIMITY_SENSOR_STATE_ERR;
+                sensor_data.state = SENSOR_STATE_ERR;
                 break;
             }
         }
@@ -173,10 +206,10 @@ void proximity_sensor_stop_work_handler(struct k_work* work) {
         ret = storage_close(FILE_TYPE_PROXIMITY);
         if (ret < 0) {
             LOG_ERR("failed to close proximity sample file");
-            sensor_data.state = PROXIMITY_SENSOR_STATE_ERR;
+            sensor_data.state = SENSOR_STATE_ERR;
             break;
         } else {
-            sensor_data.state = PROXIMITY_SENSOR_STATE_STOP;
+            sensor_data.state = SENSOR_STATE_STOP;
         }
     } while (0);
 

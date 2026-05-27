@@ -15,6 +15,8 @@ from midge_badge_framework.protocol import (
     CmdGetFileCRC32Request,
     CmdGetFreeSDSpaceRequest,
     CmdGetFWVersionRequest,
+    CmdIdentifyRequest,
+    CmdResetRequest,
     CmdSetupExperimentRequest,
     CmdStartIMURequest,
     CmdStartMicRequest,
@@ -63,7 +65,7 @@ class MidgeBadgeConsole(cmd.Cmd):
         address = None if arg == "any" else arg
         client = MidgeBadgeClient(address)
         # Launch the client in a new thread
-        Thread(target=lambda: asyncio.run(client.start())).start()
+        Thread(target=lambda: asyncio.run(client.start()), daemon=True).start()
         # wait a bit to see if the connection was established
         time.sleep(4)
 
@@ -178,6 +180,24 @@ class MidgeBadgeConsole(cmd.Cmd):
             get_fw_version
         """
         request = CmdGetFWVersionRequest()
+        self.__common_cmd_execute(request)
+
+    def do_reset(self, _):
+        """
+        Issue a "reset" command that tells the active Midge Badge to reset
+        Usage:
+            reset
+        """
+        request = CmdResetRequest()
+        self.__common_cmd_execute(request)
+
+    def do_identify(self, _):
+        """
+        Issue an "identify" command that tells the active Midge Badge to blink its LED
+        Usage:
+            identify
+        """
+        request = CmdIdentifyRequest()
         self.__common_cmd_execute(request)
 
     def do_start_mic(self, arg):

@@ -8,6 +8,15 @@
 #define INTERFACE_CMD_SZ (INTERFACE_CMD_DATA_SZ + 3)  // SOT+CMD_ID+DATA+EOT
 #define INTERFACE_MAX_FILE_NAME ((size_t)12U * 3U)    // 8.3 Filename, 3 lvl depth
 
+// ==== Flags and constants =========== //
+
+enum sensor_state : uint8_t {
+    SENSOR_STATE_DISABLED = 0,
+    SENSOR_STATE_ACTIVE = 1,
+    SENSOR_STATE_STOP = 2,
+    SENSOR_STATE_ERR = 3,
+};
+
 // ==== Miscellaneous data types ===== //
 union __attribute__((packed)) badge_assignment {
     struct __attribute__((packed)) {
@@ -24,6 +33,8 @@ struct __attribute__((packed)) custom_advertisement_data {
 };
 
 enum CmdID {
+    CMD_ID_RESET = '0',
+    CMD_ID_IDENTIFY = '1',
     CMD_ID_SETUP_EXPERIMENT = 'A',
     CMD_ID_STATUS = 'B',
     CMD_ID_GET_FW_VERSION = 'C',
@@ -42,6 +53,22 @@ enum CmdID {
 };
 
 // ==== Protocol messages =========== //
+struct __attribute__((packed)) cmd_reset_request {
+    uint16_t reserved;
+};
+
+struct __attribute__((packed)) cmd_reset_response {
+    int32_t status_code;
+};
+
+struct __attribute__((packed)) cmd_identify_request {
+    uint16_t reserved;
+};
+
+struct __attribute__((packed)) cmd_identify_response {
+    int32_t status_code;
+};
+
 struct __attribute__((packed)) cmd_setup_experiment_request {
     union badge_assignment badge_assignment;
     uint16_t experiment_id;
@@ -51,16 +78,15 @@ struct __attribute__((packed)) cmd_setup_experiment_response {
     int32_t status_code;
 };
 
-// uint16_t configured_datarate
-
 struct __attribute__((packed)) cmd_status_request {
     uint64_t millis_since_epoch;
 };
 struct __attribute__((packed)) cmd_status_response {
     uint8_t sync_status;
-    uint8_t storage_init_status;
-    uint8_t audio_init_status;
-    uint8_t proximity_init_status;
+    uint8_t storage_status;
+    uint8_t audio_state;
+    uint8_t proximity_state;
+    uint8_t imu_state;
     int16_t battery_millivolts;
     union badge_assignment badge_assignment;
     int64_t sync_error_ms;  // ref - interp
@@ -77,7 +103,7 @@ struct __attribute__((packed)) cmd_get_fw_version_response {
 struct __attribute__((packed)) cmd_start_mic_request {
     uint16_t sample_id;
     uint16_t high_sample_rate;
-    uint16_t low_sample_rate_decimation;
+    uint8_t low_sample_rate_decimation;
     uint8_t mode;  // See @ref audio.h for mode definitions
 };
 
@@ -189,6 +215,7 @@ struct __attribute__((packed)) cmd_download_file_chunk_response {
 struct __attribute__((packed)) timesync_entry {
     uint64_t reference;
     uint64_t interpolated;
+    uint64_t internal;
 };
 
 struct __attribute__((packed)) proximity_sensor_entry {

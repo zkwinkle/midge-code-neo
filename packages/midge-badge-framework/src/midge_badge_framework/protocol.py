@@ -9,7 +9,19 @@ INTERFACE_CMD_SZ = INTERFACE_CMD_DATA_SZ + 3
 INTERFACE_MAX_FILE_NAME = 12 * 3  # 3 levels of depth, i.e. SD/folder/file, 8.3 names
 
 
+class SensorState(IntEnum):
+    DISABLED = 0
+    ACTIVE = 1
+    STOP = 2
+    ERR = 3
+
+    def __str__(self):
+        return f"{self.name}:{self.value}"
+
+
 class MidgeBadgeCommandID(IntEnum):
+    CMD_ID_RESET = ord("0")
+    CMD_ID_IDENTIFY = ord("1")
     CMD_ID_SETUP_EXPERIMENT = ord("A")
     CMD_ID_STATUS = ord("B")
     CMD_ID_GET_FW_VERSION = ord("C")
@@ -120,6 +132,38 @@ class CustomAdvertisementData(Structure):
         return ret
 
 
+class CmdResetRequest(MidgeBadgeCommand):
+    _pack_ = 1
+    _fields_ = [("reserved", c_uint16)]
+
+    def id() -> int:
+        return MidgeBadgeCommandID.CMD_ID_RESET
+
+
+class CmdResetResponse(MidgeBadgeCommand):
+    _pack_ = 1
+    _fields_ = [("status_code", c_int32)]
+
+    def id() -> int:
+        return MidgeBadgeCommandID.CMD_ID_RESET
+
+
+class CmdIdentifyRequest(MidgeBadgeCommand):
+    _pack_ = 1
+    _fields_ = [("reserved", c_uint16)]
+
+    def id() -> int:
+        return MidgeBadgeCommandID.CMD_ID_IDENTIFY
+
+
+class CmdIdentifyResponse(MidgeBadgeCommand):
+    _pack_ = 1
+    _fields_ = [("status_code", c_int32)]
+
+    def id() -> int:
+        return MidgeBadgeCommandID.CMD_ID_IDENTIFY
+
+
 class CmdSetupExperimentRequest(MidgeBadgeCommand):
     _pack_ = 1
     _fields_ = [
@@ -151,9 +195,10 @@ class CmdStatusResponse(MidgeBadgeCommand):
     _pack_ = 1
     _fields_ = [
         ("sync_status", c_uint8),
-        ("storage_init_status", c_uint8),
-        ("audio_init_status", c_uint8),
-        ("proximity_init_status", c_uint8),
+        ("storage_status", c_uint8),
+        ("audio_state", c_uint8),
+        ("proximity_state", c_uint8),
+        ("imu_state", c_uint8),
         ("battery_millivolts", c_int16),
         ("badge_assignment", BadgeAssignment),
         ("sync_error_ms", c_int64),  # ref - interp
@@ -184,7 +229,7 @@ class CmdStartMicRequest(MidgeBadgeCommand):
     _fields_ = [
         ("sample_id", c_uint16),
         ("high_sample_rate", c_uint16),
-        ("low_sample_rate_decimation", c_uint16),
+        ("low_sample_rate_decimation", c_uint8),
         ("mode", c_uint8),
     ]
 
@@ -393,6 +438,8 @@ class CmdDownloadFileChunkResponse(MidgeBadgeCommand):
 
 # DATA
 CMD_RESPONSES: list[MidgeBadgeCommand] = [
+    CmdResetResponse,
+    CmdIdentifyResponse,
     CmdSetupExperimentResponse,
     CmdStatusResponse,
     CmdGetFWVersionResponse,
