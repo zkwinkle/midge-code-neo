@@ -7,17 +7,21 @@ authors = [
 description = "New Implementation of the firmware-software solution for the Midge Sociometric badges "
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = ["midge-badge-framework"]
+dependencies = [
+    "midge-badge-framework",
+]
 
 [dependency-groups]
 dev = [
-  "hatch>=1.13.0,<2",
-  "prek>=0.3.2,<2",
-  "pytest>=8.3.3,<9",
-  "pytest-cov>=5.0.0,<6",
-  "mkdocstrings[python]>=0.26.1,<1",
-  "mkdocs-material>=9.5.39,<10",
-  "setuptools-scm>=8.1.0,<9",
+  "hatch>=1.16.3",
+  "mkdocs-autorefs>=1.4.4",
+  "mkdocstrings-python>=2.0.3",
+  "prek>=0.3.2",
+  "pytest>=8.4.2",
+  "pytest-cov>=5.0.0",
+  "ruff>=0.15.7",
+  "setuptools-scm>=8.3.1",
+  "zensical>=0.0.29",
 ]
 
 [tool.uv.sources]
@@ -40,11 +44,11 @@ version-file = "_version.py"
 Homepage = "https://github.com/TUDelft-SPC-Lab/midge-code-neo"
 
 [project.scripts]
-main_script = "midge_code_neo.main:main"
 tester = "midge_code_neo.single_tester:main_sync"
 scan_parse = "midge_code_neo.scan_parse:main"
 imu_parse = "midge_code_neo.imu_parse:main"
 timesync_parse = "midge_code_neo.timesync_parse:main"
+extract_data = "midge_code_neo.extract_data:main"
 hub_cli = "midge_code_neo.hub_cli:main_sync"
 
 [tool.pytest.ini_options]
