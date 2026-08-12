@@ -99,7 +99,7 @@ This will run the checks on all files in your git project, regardless of whether
 Generate the documentation locally with
 
 ```bash
-uv run mkdocs serve --livereload
+uv run zensical serve
 ```
 
 ## Versions
